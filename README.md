@@ -32,3 +32,5 @@ fn main() {
 
 - [GitHub > MNIST Reader for Rust](https://github.com/kujirahand/mnist_reader-rust)
 
+- [Crates.io > mnist_reader](https://crates.io/crates/mnist_reader)
+- [Doc.rs > mnist_reader](https://docs.rs/mnist_reader/)
