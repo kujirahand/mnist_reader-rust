@@ -1,6 +1,6 @@
 # MNIST Reader for Rust
 
-This module provides a reader for the MNIST dataset.
+This crate provides a reader for the MNIST dataset.
 
 It downloads the dataset from GitHub if it is not already present in the specified directory. It also provides methods to load the data into memory.
 

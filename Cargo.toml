@@ -2,6 +2,14 @@
 name = "mnist_reader"
 version = "0.1.0"
 edition = "2024"
+authors = ["kujirahand <web@kujirahand.com>"]
+description = "Read MNIST dataset"
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/kujirahand/mnist_reader-rust"
+keywords = ["mnist", "dataset", "reader", "ml"]
+categories = ["ml"]
+exclude = ["mnist-data"]
 
 [dependencies]
 flate2 = "1.1.1"
