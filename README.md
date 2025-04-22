@@ -7,7 +7,7 @@ It downloads the dataset from GitHub if it is not already present in the specifi
 You can easily download and use the MNIST data as shown below.
 
 ```rust
-use crate::mnist_reader::{MnistReader, print_image};
+use mnist_reader::{MnistReader, print_image};
 
 fn main() {
     // read MNIST data
@@ -26,6 +26,12 @@ fn main() {
     let train_labels: Vec<u8> = mnist.train_labels;
     println!("labels[0]={:?}", train_labels[0]);
 }
+```
+
+### Install
+
+```sh
+cargo add mnist_reader
 ```
 
 ### Download the MNIST dataset
