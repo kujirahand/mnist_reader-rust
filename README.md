@@ -28,6 +28,13 @@ fn main() {
 }
 ```
 
+### Download the MNIST dataset
+
+This crate downloads the original MNIST dataset from GitHub. 
+
+The original MNIST dataset was hosted at `http://yann.lecun.com/exdb/mnist/`, but it is no longer available. Therefore, this crate downloads the Gzip files from a [GitHub mirror](https://github.com/fgnt/mnist).
+
+
 ## Link
 
 - [GitHub > MNIST Reader for Rust](https://github.com/kujirahand/mnist_reader-rust)
