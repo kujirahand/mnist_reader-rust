@@ -7,8 +7,8 @@ description = "Read MNIST dataset"
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/kujirahand/mnist_reader-rust"
-keywords = ["mnist", "dataset", "reader", "ml"]
-categories = ["science", "computer-vision", "machine-learning"]
+keywords = ["mnist", "dataset", "reader", "ml", "machine learning"]
+categories = ["science", "computer-vision"]
 exclude = ["mnist-data"]
 
 [dependencies]
