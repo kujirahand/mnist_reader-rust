@@ -125,7 +125,7 @@ fn download_file(url: &str, out_path: &str) -> io::Result<()> {
 }
 
 
-// ungzip a file
+/// ungzip a file
 pub fn ungzip(in_path: &str, out_path: &str) -> io::Result<()> {
     let input = File::open(in_path)?;
     let mut output = File::create(out_path)?;
@@ -134,7 +134,7 @@ pub fn ungzip(in_path: &str, out_path: &str) -> io::Result<()> {
     Ok(())
 }
 
-// read from gzip file to memory
+/// read from gzip file to memory
 pub fn read_gzip(in_path: &str) -> io::Result<Vec<u8>> {
     let file = File::open(in_path)?;
     let mut decoder = GzDecoder::new(file);
@@ -144,7 +144,7 @@ pub fn read_gzip(in_path: &str) -> io::Result<Vec<u8>> {
 }
 
 
-// read MNIST labels
+/// read MNIST labels
 fn read_mnist_labels(file_path: &str) -> io::Result<Vec<u8>> {
     let data = read_gzip(file_path)?;
     // skip 8 bytes of header
@@ -152,7 +152,7 @@ fn read_mnist_labels(file_path: &str) -> io::Result<Vec<u8>> {
     Ok(labels)
 }
 
-// read MNIST images
+/// read MNIST images
 fn read_mnist_images(file_path: &str) -> io::Result<Vec<Vec<f32>>> {
     let raw_bytes = read_gzip(file_path)?;
 
@@ -192,7 +192,6 @@ pub fn print_image(image: &[f32]) {
 }
 
 
-/// test
 #[cfg(test)]
 mod tests {
     use super::*;

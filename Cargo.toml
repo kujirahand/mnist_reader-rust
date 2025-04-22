@@ -1,6 +1,6 @@
 [package]
 name = "mnist_reader"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 authors = ["kujirahand <web@kujirahand.com>"]
 description = "Download the MNIST dataset and simply read it."
