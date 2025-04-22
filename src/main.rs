@@ -1,14 +1,4 @@
-# MNIST Reader for Rust
-
-This module provides a reader for the MNIST dataset.
-
-It downloads the dataset from GitHub if it is not already present in the specified directory. It also provides methods to load the data into memory.
-
-You can easily download and use the MNIST data as shown below.
-
-```rust
-use crate::mnist_reader::{MnistReader, print_image};
-
+use mnist_reader::{MnistReader, print_image};
 fn main() {
     // read MNIST data
     let mut mnist = MnistReader::new("mnist-data");
@@ -26,9 +16,3 @@ fn main() {
     let train_labels: Vec<u8> = mnist.train_labels;
     println!("labels[0]={:?}", train_labels[0]);
 }
-```
-
-## Link
-
-- [GitHub > MNIST Reader for Rust](https://github.com/kujirahand/mnist_reader-rust)
-
