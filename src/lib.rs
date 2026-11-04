@@ -30,10 +30,18 @@
 use std::fs::{self, File};
 use std::io::{self, Read};
 use flate2::read::GzDecoder;
-use ureq;
 use std::path::Path;
+use sha2::{Digest, Sha256};
 
 static MNIST_DATA_URL: &str = "https://raw.githubusercontent.com/fgnt/mnist/master";
+
+/// MNIST file names and their expected SHA-256 digests
+const MNIST_FILES: [(&str, &str); 4] = [
+    ("train-images-idx3-ubyte.gz", "440fcabf73cc546fa21475e81ea370265605f56be210a4024d2ca8f203523609"),
+    ("train-labels-idx1-ubyte.gz", "3552534a0a558bbed6aed32b30c495cca23d567ec52cac8be1a0730e8010255c"),
+    ("t10k-images-idx3-ubyte.gz", "8d422c7b0a1c1c79245a5bcf07fe86e33eeafee792b84584aec276f5a2dbc4e6"),
+    ("t10k-labels-idx1-ubyte.gz", "f7ae60f92e00ec6debd23a6088c31dbd2371eca3ffa0defaefb259924204aec6"),
+];
 
 /// MNIST data reader
 /// This struct is used to read MNIST data from the given directory.
@@ -65,20 +73,15 @@ impl MnistReader {
         // check directory
         fs::create_dir_all(save_dir)?;
         // download files
-        let files = [
-            "train-images-idx3-ubyte.gz",
-            "train-labels-idx1-ubyte.gz",
-            "t10k-images-idx3-ubyte.gz",
-            "t10k-labels-idx1-ubyte.gz",
-        ];
-        for file in &files {
+        for (file, sha256) in &MNIST_FILES {
             let url = format!("{}/{}", mnist_url, file);
             let out_path = format!("{}/{}", save_dir, file);
             if !Path::new(&out_path).exists() {
                 println!("Downloading: {}...", file);
-                download_file(&url, &out_path)?;
+                download_file(&url, &out_path, sha256)?;
             } else {
                 println!("File: {}", file);
+                verify_sha256(&out_path, sha256)?;
             }
         }
         Ok(())
@@ -98,8 +101,8 @@ impl MnistReader {
         let type_str = if is_train { "train" } else { "t10k" };
         let label_file = format!("{}/{}-labels-idx1-ubyte.gz", self.save_dir, type_str);
         let image_file = format!("{}/{}-images-idx3-ubyte.gz", self.save_dir, type_str);
-        let labels = read_mnist_labels(&label_file).unwrap();
-        let images = read_mnist_images(&image_file).unwrap();
+        let labels = read_mnist_labels(&label_file)?;
+        let images = read_mnist_images(&image_file)?;
         if is_train {
             self.train_labels = labels;
             self.train_data = images;
@@ -112,16 +115,48 @@ impl MnistReader {
 
 }
 
-/// download a file from url
-fn download_file(url: &str, out_path: &str) -> io::Result<()> {
-    let mut response = ureq::get(url).call().map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
-    if response.status() != 200 {
-        return Err(io::Error::new(io::ErrorKind::Other, format!("Failed to download file: {}", response.status())));
+/// verify the SHA-256 digest of a file
+fn verify_sha256(path: &str, expected: &str) -> io::Result<()> {
+    let mut file = File::open(path)?;
+    let mut hasher = Sha256::new();
+    let mut buf = [0u8; 64 * 1024];
+    loop {
+        let n = file.read(&mut buf)?;
+        if n == 0 {
+            break;
+        }
+        hasher.update(&buf[..n]);
     }
-    let mut file = File::create(out_path)?;
-    let mut reader = response.body_mut().as_reader();
-    io::copy(&mut reader, &mut file)?;
+    let actual: String = hasher.finalize().iter().map(|b| format!("{:02x}", b)).collect();
+    if actual != expected {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("checksum mismatch for {}: expected {}, got {}", path, expected, actual),
+        ));
+    }
     Ok(())
+}
+
+/// download a file from url
+fn download_file(url: &str, out_path: &str, sha256: &str) -> io::Result<()> {
+    let mut response = ureq::get(url).call().map_err(|e| io::Error::other(e.to_string()))?;
+    if response.status() != 200 {
+        return Err(io::Error::other(format!("Failed to download file: {}", response.status())));
+    }
+    // write to a temporary file first so an interrupted download never leaves a broken file
+    let tmp_path = format!("{}.part", out_path);
+    let result = (|| {
+        let mut file = File::create(&tmp_path)?;
+        let mut reader = response.body_mut().as_reader();
+        io::copy(&mut reader, &mut file)?;
+        file.sync_all()?;
+        verify_sha256(&tmp_path, sha256)?;
+        fs::rename(&tmp_path, out_path)
+    })();
+    if result.is_err() {
+        let _ = fs::remove_file(&tmp_path);
+    }
+    result
 }
 
 
@@ -144,12 +179,31 @@ pub fn read_gzip(in_path: &str) -> io::Result<Vec<u8>> {
 }
 
 
+fn invalid(msg: &str) -> io::Error {
+    io::Error::new(io::ErrorKind::InvalidData, msg.to_string())
+}
+
+fn read_u32_be(data: &[u8], offset: usize) -> io::Result<usize> {
+    let bytes: [u8; 4] = data
+        .get(offset..offset + 4)
+        .ok_or_else(|| invalid("file is too short"))?
+        .try_into()
+        .map_err(|_| invalid("file is too short"))?;
+    Ok(u32::from_be_bytes(bytes) as usize)
+}
+
 /// read MNIST labels
 fn read_mnist_labels(file_path: &str) -> io::Result<Vec<u8>> {
     let data = read_gzip(file_path)?;
-    // skip 8 bytes of header
-    let labels = data[8..].to_vec();
-    Ok(labels)
+    if read_u32_be(&data, 0)? != 0x0000_0801 {
+        return Err(invalid("invalid magic number in label file"));
+    }
+    let num_labels = read_u32_be(&data, 4)?;
+    let labels = &data[8..];
+    if labels.len() != num_labels {
+        return Err(invalid("label count does not match header"));
+    }
+    Ok(labels.to_vec())
 }
 
 /// read MNIST images
@@ -157,23 +211,27 @@ fn read_mnist_images(file_path: &str) -> io::Result<Vec<Vec<f32>>> {
     let raw_bytes = read_gzip(file_path)?;
 
     // read header
-    let num_images = u32::from_be_bytes(raw_bytes[4..8].try_into().unwrap()) as usize;
-    let num_rows = u32::from_be_bytes(raw_bytes[8..12].try_into().unwrap()) as usize;
-    let num_cols = u32::from_be_bytes(raw_bytes[12..16].try_into().unwrap()) as usize;
-    let image_size = num_rows * num_cols;
-
-    let mut images = Vec::with_capacity(num_images);
-    let images_raw = &raw_bytes[16..]; // header is 16 bytes
-
-    for i in 0..num_images {
-        let start = i * image_size;
-        let end = start + image_size;
-        let image: Vec<f32> = images_raw[start..end]
-            .iter()
-            .map(|&b| b as f32 / 255.0)
-            .collect();
-        images.push(image);
+    if read_u32_be(&raw_bytes, 0)? != 0x0000_0803 {
+        return Err(invalid("invalid magic number in image file"));
     }
+    let num_images = read_u32_be(&raw_bytes, 4)?;
+    let num_rows = read_u32_be(&raw_bytes, 8)?;
+    let num_cols = read_u32_be(&raw_bytes, 12)?;
+    let image_size = num_rows
+        .checked_mul(num_cols)
+        .ok_or_else(|| invalid("invalid image size"))?;
+    let images_raw = &raw_bytes[16..]; // header is 16 bytes
+    let expected = num_images
+        .checked_mul(image_size)
+        .ok_or_else(|| invalid("invalid image count"))?;
+    if image_size == 0 || images_raw.len() != expected {
+        return Err(invalid("image data size does not match header"));
+    }
+
+    let images = images_raw
+        .chunks_exact(image_size)
+        .map(|img| img.iter().map(|&b| b as f32 / 255.0).collect())
+        .collect();
     Ok(images)
 }
 
@@ -198,7 +256,7 @@ mod tests {
 
     #[test]
     fn test_download_files() {
-        let save_dir = "data";
+        let save_dir = "mnist-data";
         let mut reader = MnistReader::new(save_dir);
         reader.load().unwrap();
         assert!(!reader.train_labels.is_empty());

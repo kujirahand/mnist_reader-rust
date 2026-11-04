@@ -10,8 +10,9 @@ repository = "https://github.com/kujirahand/mnist_reader-rust"
 documentation = "https://docs.rs/mnist_reader"
 keywords = ["mnist", "dataset", "reader", "ml"]
 categories = ["science", "computer-vision"]
-exclude = ["mnist-data"]
+exclude = ["mnist-data", "data"]
 
 [dependencies]
 flate2 = "1.1.1"
+sha2 = "0.11.1"
 ureq = "3.0.11"
